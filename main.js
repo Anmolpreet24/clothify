@@ -225,6 +225,7 @@ function send() {
     .catch((error) => {
       console.error("Error fetching Firebase ID:", error);
     });
+    sendEmail();
   window.alert("order successfull,thank you for shopping");
   //   window.location.reload();
   document.getElementById("components").innerHTML = "";
@@ -240,4 +241,154 @@ function send() {
   a.href = "./";
 
   document.getElementById("components").append(h1, a);
+
 }
+
+
+//admin page
+function adminCheck(){
+    var user=document.getElementById("adminUser").value;
+    var pass=document.getElementById("adminPass").value;
+
+    if(user=="anmol" && pass=="1234"){
+        console.log("success");
+        window.alert("welcome back");
+
+        document.getElementById("admin-box").style.display="block";
+        document.getElementById("credentials").style.display="none";
+
+        loadOrders();
+    }
+    else{
+        window.alert("wrong password");
+    }
+}
+
+
+function loadOrders() {
+    const completedDiv = document.getElementById("completed");
+    const pendingDiv = document.getElementById("pending");
+  
+    // Fetch the current 'id' to determine the total number of orders
+    db.ref("id").once("value")
+      .then((snapshot) => {
+        const totalOrders = snapshot.val();
+  
+        // Loop through each order ID from 1 to totalOrders - 1
+        for (let orderId = 1; orderId < totalOrders; orderId++) {
+          db.ref(`orders/order_${orderId}`).once("value")
+            .then((orderSnapshot) => {
+              const orderData = orderSnapshot.val();
+  
+              if (orderData) {
+                // Create a div to display the order details
+                const orderDiv = document.createElement("div");
+                orderDiv.classList.add("order");
+                
+                // Populate order details
+                orderDiv.innerHTML = `
+                  <p><strong>Order ID:</strong> order_${orderId}</p>
+                  <p><strong>Address:</strong> ${orderData.address}</p>
+                  <p><strong>Phone:</strong> ${orderData.phone}</p>
+                  <p><strong>Status:</strong> ${orderData.status}</p>
+                `;
+  
+                // Loop through items in the order and display each
+                for (const key in orderData) {
+                  if (!isNaN(key)) {
+                    const item = orderData[key];
+                    const itemDiv = document.createElement("p");
+                    itemDiv.textContent = `Item: ${item.name}, Price: ${item.price}`;
+                    orderDiv.appendChild(itemDiv);
+                  }
+                }
+  
+                // If the order is pending, add a "Complete Order" button
+                if (orderData.status === "pending") {
+                  const completeButton = document.createElement("button");
+                  completeButton.textContent = "Complete Order";
+                  completeButton.onclick = () => completeOrder(orderId, orderDiv);
+                  orderDiv.appendChild(completeButton);
+                  pendingDiv.appendChild(orderDiv);
+                } else if (orderData.status === "completed") {
+                  completedDiv.appendChild(orderDiv);
+                }
+              }
+            })
+            .catch((error) => {
+              console.error("Error fetching order:", error);
+            });
+        }
+      })
+      .catch((error) => {
+        console.error("Error fetching ID:", error);
+      });
+  }
+  
+  // Function to mark an order as completed
+  function completeOrder(orderId, orderDiv) {
+    const confirmed = confirm("Are you sure you want to mark this order as completed?");
+    if (confirmed) {
+      // Update the order's status in Firebase
+      db.ref(`orders/order_${orderId}/status`).set("completed")
+        .then(() => {
+          console.log(`Order ${orderId} marked as completed.`);
+          
+          // Move the order div from pending to completed
+          document.getElementById("pending").removeChild(orderDiv);
+          orderDiv.querySelector("button").remove(); // Remove the "Complete Order" button
+          document.getElementById("completed").appendChild(orderDiv);
+          
+          // Update the status text in the div
+          orderDiv.querySelector("p:last-child").textContent = "Status: completed";
+        })
+        .catch((error) => {
+          console.error("Error updating order status:", error);
+        });
+    }
+  }
+  
+  
+
+  function sendEmail() {
+    const userEmail = document.getElementById("userEmail").value;
+    const adminEmail = "anmolpreet7788@gmail.com";  // admin email
+
+    // var component_contents=document.getElementById("components").innerHTML;
+    // var total_contents=document.getElementById("total").innerHTML;
+
+    // console.log(component_contents);
+    // console.log(total_contents);
+  
+    if (!userEmail) {
+        alert("Please enter a valid email address.");
+        return;
+    }
+  
+    // Email data for the user
+    const userParams = {
+        to_email: userEmail,
+        message: "Thank you for signing up!"
+    };
+  
+    // Email data for the admin
+    const adminParams = {
+        to_email: adminEmail,
+        message: `A new user has signed up with the email: ${userEmail}`
+    };
+  
+    // Send email to the user
+    emailjs.send("service_98css64", "template_w914z0u", userParams)
+        .then(response => {
+            console.log("User email sent successfully:", response.status, response.text);
+            // alert("Confirmation email sent to user!");
+        })
+        .catch(error => console.error("Failed to send user email:", error));
+  
+    // Send email to the admin
+    emailjs.send("service_98css64", "template_w914z0u", adminParams)
+        .then(response => {
+            console.log("Admin email sent successfully:", response.status, response.text);
+        })
+        .catch(error => console.error("Failed to send admin email:", error));
+  }
